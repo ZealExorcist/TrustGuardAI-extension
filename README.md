@@ -20,13 +20,14 @@ A browser extension that analyzes web content for potentially harmful content an
 
 ### Chrome/Edge/Brave Installation
 1. Download or clone this repository
-2. Open your browser and navigate to the extensions page:
+2. Add your api key in the .env file
+3. Open your browser and navigate to the extensions page:
    - Chrome: `chrome://extensions/`
    - Edge: `edge://extensions/`
    - Brave: `brave://extensions/`
-3. Enable "Developer mode" at the top-right corner
-4. Click "Load unpacked" and select the directory containing this extension
-5. The Web Safety Analyzer extension should now appear in your browser toolbar
+4. Enable "Developer mode" at the top-right corner
+5. Click "Load unpacked" and select the directory containing this extension
+6. The Web Safety Analyzer extension should now appear in your browser toolbar
 
 ## How to Use
 
