@@ -1,5 +1,5 @@
 // Gemini API configuration
-const GEMINI_API_KEY = "AIzaSyDOpyx7Vq8Ng4S8IOVbOnMrWsi5DMCIXMA"; // Replace with your API key
+const DEFAULT_GEMINI_API_KEY = ""; // Default key as fallback
 const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro-latest:generateContent";
 
 // Initialize context menu
@@ -37,9 +37,18 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 // Listen for messages from content script
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "analyzeContent") {
+    console.log("Background received analyzeContent request");
+    
     analyzeContentWithGemini(request.content)
-      .then(analysis => sendResponse(analysis))
-      .catch(error => sendResponse({ error: error.message }));
+      .then(analysis => {
+        console.log("Analysis completed:", analysis);
+        sendResponse(analysis);
+      })
+      .catch(error => {
+        console.error("Analysis error:", error);
+        sendResponse({ error: error.message });
+      });
+    
     return true; // Indicates async response
   } else if (request.action === "createContextMenu") {
     // Remove existing menu if it exists
@@ -59,7 +68,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 // Function to analyze content using Gemini AI
 async function analyzeContentWithGemini(content) {
   try {
-    const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+    // Get the API key from storage or use default
+    const storageData = await new Promise(resolve => 
+      chrome.storage.sync.get('geminiApiKey', resolve)
+    );
+    
+    // Use custom key if available, otherwise use default
+    const apiKey = storageData.geminiApiKey || DEFAULT_GEMINI_API_KEY;
+    
+    // Log which key is being used (for debugging, don't expose the actual key)
+    console.log("Using " + (storageData.geminiApiKey ? "custom" : "default") + " API key");
+    
+    const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -79,13 +99,19 @@ async function analyzeContentWithGemini(content) {
       })
     });
 
-    const data = await response.json();
+    const responseData = await response.json();
     
     if (!response.ok) {
-      throw new Error(data.error?.message || "Failed to analyze content");
+      const errorMsg = responseData.error?.message || "Failed to analyze content";
+      // Check for API key related errors
+      if (errorMsg.includes("API key") || response.status === 403) {
+        throw new Error("Invalid API key or quota exceeded. Please check your API key in settings.");
+      } else {
+        throw new Error(errorMsg);
+      }
     }
 
-    return processGeminiResponse(data);
+    return processGeminiResponse(responseData);
   } catch (error) {
     console.error("Error analyzing content:", error);
     throw error;
