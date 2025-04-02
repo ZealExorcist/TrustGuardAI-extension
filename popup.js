@@ -11,6 +11,57 @@ document.addEventListener('DOMContentLoaded', function() {
   const enableToggle = document.getElementById('enable-toggle');
   const toggleStatus = document.getElementById('toggle-status');
   
+  // Settings elements
+  const settingsIcon = document.getElementById('settings-icon');
+  const settingsPanel = document.getElementById('settings-panel');
+  const apiKeyInput = document.getElementById('api-key');
+  const saveApiKeyBtn = document.getElementById('save-api-key');
+  const apiKeyStatus = document.getElementById('api-key-status');
+  
+  // Toggle settings panel
+  settingsIcon.addEventListener('click', function() {
+    settingsPanel.classList.toggle('active');
+    
+    // Load saved API key when settings panel is opened
+    if (settingsPanel.classList.contains('active')) {
+      chrome.storage.sync.get('geminiApiKey', function(data) {
+        if (data.geminiApiKey) {
+          apiKeyInput.value = data.geminiApiKey;
+          apiKeyStatus.textContent = "API key is set";
+          apiKeyStatus.style.color = "#4CAF50";
+        } else {
+          apiKeyInput.value = "";
+          apiKeyStatus.textContent = "No API key set (using default)";
+          apiKeyStatus.style.color = "#FFC107";
+        }
+      });
+    }
+  });
+  
+  // Save API key
+  saveApiKeyBtn.addEventListener('click', function() {
+    const apiKey = apiKeyInput.value.trim();
+    
+    if (apiKey === "") {
+      // If empty, remove the stored key (will use default)
+      chrome.storage.sync.remove('geminiApiKey', function() {
+        apiKeyStatus.textContent = "API key removed, using default";
+        apiKeyStatus.style.color = "#FFC107";
+      });
+    } else {
+      // Save the API key
+      chrome.storage.sync.set({geminiApiKey: apiKey}, function() {
+        apiKeyStatus.textContent = "API key saved successfully";
+        apiKeyStatus.style.color = "#4CAF50";
+        
+        // Clear after 3 seconds
+        setTimeout(() => {
+          apiKeyStatus.textContent = "API key is set";
+        }, 3000);
+      });
+    }
+  });
+  
   // Display an error message in the popup
   function showError(message) {
     statusText.textContent = message || "Error occurred";
@@ -105,30 +156,64 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // Analyze button click handler
   analyzeBtn.addEventListener('click', function() {
-    statusText.textContent = "Analyzing...";
-    
-    chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-      if (!tabs || tabs.length === 0) {
-        showError("No active tab found");
-        return;
+    // First check if API key is set
+    chrome.storage.sync.get('geminiApiKey', function(data) {
+      if (!data.geminiApiKey) {
+        // If no custom API key, check if default should be used
+        const useDefault = confirm("No custom API key set. Continue with default key?");
+        if (!useDefault) {
+          // Open settings panel if user wants to set their own key
+          settingsPanel.classList.add('active');
+          return;
+        }
       }
       
-      console.log("Sending analyzePageContent message to tab:", tabs[0].id);
+      statusText.textContent = "Analyzing...";
+      scoreContainer.style.display = "none"; // Hide previous results
       
-      chrome.tabs.sendMessage(tabs[0].id, {action: "analyzePageContent"}, function(response) {
-        if (chrome.runtime.lastError) {
-          console.error("Error analyzing page:", chrome.runtime.lastError.message);
-          showError("Failed to analyze page");
+      // Continue with analysis...
+      chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+        if (!tabs || tabs.length === 0) {
+          showError("No active tab found");
           return;
         }
         
-        console.log("Received response from content script:", response);
+        console.log("Sending analyzePageContent message to tab:", tabs[0].id);
         
-        if (response && response.success) {
-          statusText.textContent = "Analysis in progress...";
-        } else {
-          showError("Analysis failed");
-        }
+        // Send message to initiate analysis
+        chrome.tabs.sendMessage(tabs[0].id, {action: "analyzePageContent"}, function(response) {
+          if (chrome.runtime.lastError) {
+            console.error("Error analyzing page:", chrome.runtime.lastError.message);
+            showError("Failed to analyze page");
+            return;
+          }
+          
+          console.log("Received response from content script:", response);
+          
+          if (response && response.success) {
+            statusText.textContent = "Analysis in progress...";
+            
+            // Poll for results after a delay
+            setTimeout(function checkAnalysisStatus() {
+              chrome.tabs.sendMessage(tabs[0].id, {action: "getAnalysisStatus"}, function(statusResponse) {
+                if (chrome.runtime.lastError) {
+                  console.warn("Error checking status:", chrome.runtime.lastError.message);
+                  return;
+                }
+                
+                if (statusResponse && statusResponse.analyzed) {
+                  // Analysis completed, update UI
+                  updateStatus(statusResponse.safetyScore);
+                } else {
+                  // Still analyzing, check again after a delay
+                  setTimeout(checkAnalysisStatus, 1000);
+                }
+              });
+            }, 1500);
+          } else {
+            showError("Analysis failed");
+          }
+        });
       });
     });
   });
