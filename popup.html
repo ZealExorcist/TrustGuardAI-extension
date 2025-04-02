@@ -198,11 +198,53 @@
     #toggle-status {
       font-weight: bold;
     }
+
+    /* Settings styles */
+    .settings-icon {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      cursor: pointer;
+      color: var(--secondary-text-color);
+      font-size: 18px;
+    }
+    
+    .settings-panel {
+      display: none;
+      padding: 10px;
+      background-color: var(--background-color);
+      border-top: 1px solid var(--border-color);
+      margin-top: 10px;
+    }
+    
+    .settings-panel.active {
+      display: block;
+    }
+    
+    .settings-panel input {
+      width: 100%;
+      padding: 8px;
+      margin: 5px 0;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      background-color: var(--background-color);
+      color: var(--text-color);
+    }
+    
+    .settings-panel button {
+      margin-top: 5px;
+    }
+    
+    .settings-panel .api-key-status {
+      font-size: 12px;
+      margin-top: 5px;
+    }
   </style>
 </head>
 <body>
   <div class="container">
     <h2>Web Safety Analyzer</h2>
+    <div class="settings-icon" id="settings-icon">⚙️</div>
     
     <!-- Add site toggle -->
     <div class="toggle-container">
@@ -211,6 +253,16 @@
         <span class="toggle-slider"></span>
       </label>
       <span id="toggle-status">Enabled for this site</span>
+    </div>
+    
+    <!-- Settings Panel -->
+    <div class="settings-panel" id="settings-panel">
+      <h3>Settings</h3>
+      <label for="api-key">Gemini API Key:</label>
+      <input type="password" id="api-key" placeholder="Enter your Gemini API Key">
+      <button id="save-api-key">Save API Key</button>
+      <div class="api-key-status" id="api-key-status"></div>
+      <p>Get your API key from <a href="https://makersuite.google.com/app/apikey" target="_blank">Google AI Studio</a></p>
     </div>
     
     <div class="status">
